@@ -13,24 +13,31 @@ ut-course-catalog
         :target: https://ut-course-catalog.readthedocs.io/en/latest/?version=latest
         :alt: Documentation Status
 
-
 .. image:: https://pyup.io/repos/github/34j/ut_course_catalog/shield.svg
      :target: https://pyup.io/repos/github/34j/ut_course_catalog/
      :alt: Updates
 
 
 
-Fetch UTokyo Online Course Catalogue.
+Python package to fetch UTokyo Online Course Catalogue.
 
+Installation
+------------
 
-* Free software: MIT license
-* Documentation: https://ut-course-catalog.readthedocs.io.
+Install ``ut_course_catalog`` using ``pip``:
 
+```
+pip install ut_course_catalog
+```
 
 Features
 --------
 
-* TODO
+* Fetches UTokyo Online Course Catalogue.
+        * `fetch_search()`
+        * `fetch_details()`
+
+For more information, see the `documentation <https://ut-course-catalog.readthedocs.io>`_.
 
 Credits
 -------

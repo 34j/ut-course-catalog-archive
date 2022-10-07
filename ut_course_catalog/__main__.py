@@ -1,15 +1,14 @@
 """Console script for ut_course_catalog."""
 import sys
+
 import click
 
 
 @click.command()
 def main(args=None):
     """Console script for ut_course_catalog."""
-    click.echo("Replace this message by putting your code into "
-               "ut_course_catalog.cli.main")
-    click.echo("See click documentation at https://click.palletsprojects.com/")
-    return 0
+    raise NotImplementedError("This is a stub.")
+    return -1
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ deploy:
   distributions: sdist bdist_wheel
   user: 34j
   password:
-    secure: PLEASE_REPLACE_ME
+    secure: 
   on:
     tags: true
     repo: 34j/ut_course_catalog
