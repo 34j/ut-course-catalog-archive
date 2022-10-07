@@ -26,9 +26,9 @@ Installation
 
 Install ``ut_course_catalog`` using ``pip``:
 
-``
-pip install ut_course_catalog
-``
+.. code-block:: shell
+        pip install ut_course_catalog
+
 
 Features
 --------
