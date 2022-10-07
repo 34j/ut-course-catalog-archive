@@ -8,10 +8,13 @@ Welcome to ut-course-catalog's documentation!
    readme
    installation
    usage
-   modules
    contributing
-   authors
-   history
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference:
+
+   ut_course_catalog
 
 Indices and tables
 ==================
