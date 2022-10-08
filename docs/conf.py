@@ -35,6 +35,11 @@ import ut_course_catalog
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = ["sphinx.ext.napoleon", "sphinx.ext.autodoc", 'sphinx.ext.viewcode', 'myst_parser']
 napoleon_google_docstring = False
+source_suffix = {
+    '.rst': 'restructuredtext',
+    '.txt': 'markdown',
+    '.md': 'markdown',
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

@@ -14,3 +14,5 @@ shed
 pytest
 aiohttp>=3.8
 beautifulsoup4>=4.8
+myst_parser
+sphinx_rtd_theme
