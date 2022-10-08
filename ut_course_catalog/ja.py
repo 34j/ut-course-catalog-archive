@@ -14,7 +14,6 @@ from typing import (
     Awaitable,
     Callable,
     Iterable,
-    List,
     NamedTuple,
     Optional,
     TypeVar,
@@ -24,7 +23,9 @@ import aiofiles
 
 import aiohttp
 from bs4 import BeautifulSoup, ResultSet, Tag
-from tenacity import WrappedFn, retry, stop_after_attempt, stop_after_delay, wait_exponential, wait_fixed
+from tenacity import WrappedFn, retry
+from tenacity.stop import stop_after_attempt, stop_after_delay
+from tenacity.wait import wait_exponential
 from tqdm import tqdm, trange
 
 from ut_course_catalog.common import Semester, Weekday, BASE_URL
