@@ -3,6 +3,7 @@ ut-course-catalog
 =================
 
 .. image:: https://img.shields.io/github/license/34j/ut-course-catalog
+        :target: https://github.com/34j/ut-course-catalog
         :alt: GitHub License
 
 .. image:: https://img.shields.io/pypi/v/ut_course_catalog.svg
