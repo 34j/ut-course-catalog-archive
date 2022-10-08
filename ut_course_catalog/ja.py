@@ -7,7 +7,7 @@ import math
 import pickle
 import re
 from dataclasses import dataclass
-from enum import Enum, IntEnum
+from enum import Enum
 from typing import (
     AsyncIterable,
     Awaitable,
@@ -39,7 +39,7 @@ class Institution(Enum):
     All = "all"
 
 
-class Faculty(IntEnum):
+class Faculty(Enum):
     """Faculty in the University of Tokyo."""
 
     法学部 = 1
