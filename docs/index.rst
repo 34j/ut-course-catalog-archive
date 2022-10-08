@@ -1,5 +1,5 @@
 Welcome to ut-course-catalog's documentation!
-======================================
+=============================================
 
 .. toctree::
    :maxdepth: 2
