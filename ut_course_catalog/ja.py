@@ -1,6 +1,7 @@
 from __future__ import annotations
 from asyncio import create_task
 import asyncio
+from decimal import Decimal
 import hashlib
 from inspect import isawaitable
 import math
@@ -13,6 +14,7 @@ from typing import (
     Awaitable,
     Callable,
     Iterable,
+    List,
     NamedTuple,
     Optional,
     TypeVar,
@@ -22,6 +24,7 @@ import aiofiles
 
 import aiohttp
 from bs4 import BeautifulSoup, ResultSet, Tag
+from tenacity import WrappedFn, retry, stop_after_attempt, stop_after_delay, wait_exponential, wait_fixed
 from tqdm import tqdm, trange
 
 from ut_course_catalog.common import Semester, Weekday, BASE_URL
@@ -266,7 +269,7 @@ class Details(NamedTuple):
     曜限: set[tuple[Weekday, int]]
     ねらい: str
     教室: str
-    単位数: int
+    単位数: Decimal
     他学部履修可: bool
     講義使用言語: str
     実務経験のある教員による授業科目: bool
@@ -643,7 +646,7 @@ class UTCourseCatalog:
                 ),
                 曜限=_parse_weekday_period(get_cell1("period")),
                 教室=get_cell2(0),
-                単位数=int(get_cell2(1)),
+                単位数=Decimal(get_cell2(1)),
                 他学部履修可="不可" not in get_cell2(2),
                 講義使用言語=get_cell2(3),
                 実務経験のある教員による授業科目="YES" in get_cell2(4),
@@ -682,6 +685,10 @@ class UTCourseCatalog:
         """
         result = await self.fetch_search(SearchParams(keyword=共通科目コード))
         return result.items[0].時間割コード
+    
+    def retry(self, func: WrappedFn) -> WrappedFn:
+        return retry(stop=(stop_after_delay(10) | stop_after_attempt(3)), 
+                     wait=wait_exponential(multiplier=1, min=4, max=16))(func)
 
     async def fetch_search_all(
         self,
@@ -725,7 +732,7 @@ class UTCourseCatalog:
 
         for page in trange(2, result.total_pages + 1, disable=not use_tqdm):
             wait_task = create_task(asyncio.sleep(interval_seconds))
-            result_task = create_task(self.fetch_search(params, page))
+            result_task = create_task(self.retry(self.fetch_search)(params, page))
             wait, result = await asyncio.gather(wait_task, result_task)
             for item in result.items:
                 yield item
@@ -773,7 +780,7 @@ class UTCourseCatalog:
             on_initial_request=on_initial_request,
         ):
             wait_task = create_task(asyncio.sleep(interval_seconds))
-            detail_task = create_task(self.fetch_detail(item.時間割コード, year))
+            detail_task = create_task(self.retry(self.fetch_detail)(item.時間割コード, year))
             wait, detail = await asyncio.gather(wait_task, detail_task)
             yield detail
 
