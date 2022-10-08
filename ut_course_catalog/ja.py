@@ -1,10 +1,13 @@
 from __future__ import annotations
 from asyncio import create_task
 import asyncio
+from asyncio.log import logger
 from decimal import Decimal
 import hashlib
 from inspect import isawaitable
+from logging import Logger, getLogger
 import math
+from pathlib import Path
 import pickle
 import re
 from dataclasses import dataclass
@@ -26,6 +29,7 @@ from bs4 import BeautifulSoup, ResultSet, Tag
 from tenacity import WrappedFn, retry
 from tenacity.stop import stop_after_attempt, stop_after_delay
 from tenacity.wait import wait_exponential
+from tenacity.before_sleep import before_sleep_log
 from tqdm import tqdm, trange
 
 from ut_course_catalog.common import Semester, Weekday, BASE_URL
@@ -339,12 +343,17 @@ def _ensure_found(obj: object) -> Tag:
 
 def _parse_weekday_period(period_text: str) -> set[tuple[Weekday, int]]:
     period_text = _format(period_text)
-    if period_text == "集中":
+    # if period_text == "集中":
+    # Most complex case:"S1: 集中、A1: 月曜3限 他"
+    if ":" in period_text:
+        return set()
+    # Ignore others if period_text contains "集中"
+    if "集中" in period_text:
         return set()
     period_texts = period_text.split("、")
 
     def parse_one(period: str):
-        w = Weekday([weekday in period for weekday in list("月火水木金土日集")].index(True))
+        w = Weekday([weekday in period for weekday in list("月火水木金土日")].index(True))
         reres = re.search(r"\d+", period)
         if not reres:
             raise ValueError(f"Invalid period: {period}")
@@ -371,9 +380,12 @@ class UTCourseCatalog:
     """A parser for the [UTokyo Online Course Catalogue](https://catalog.he.u-tokyo.ac.jp)."""
 
     session: Optional[aiohttp.ClientSession]
+    _logger: Logger
 
-    def __init__(self) -> None:
+    def __init__(self, logger_level: int = 20) -> None:
         self.session = None
+        self._logger = getLogger(__name__)
+        self._logger.setLevel(logger_level)
 
     async def __aenter__(self):
         if self.session:
@@ -686,10 +698,13 @@ class UTCourseCatalog:
         """
         result = await self.fetch_search(SearchParams(keyword=共通科目コード))
         return result.items[0].時間割コード
-    
+
     def retry(self, func: WrappedFn) -> WrappedFn:
-        return retry(stop=(stop_after_delay(10) | stop_after_attempt(3)), 
-                     wait=wait_exponential(multiplier=1, min=4, max=16))(func)
+        return retry(
+            stop=(stop_after_delay(10) | stop_after_attempt(3)),
+            wait=wait_exponential(multiplier=1, min=4, max=16),
+            before=before_sleep_log(self._logger, 30),
+        )(func)
 
     async def fetch_search_all(
         self,
@@ -829,6 +844,8 @@ class UTCourseCatalog:
             filename = params.id()
         if not filename.endswith(".pkl"):
             filename += ".pkl"
+        filepath = Path(filename)
+        self._logger.info(f"Saving to {filepath}")
         result = []
 
         pbar = tqdm(disable=not use_tqdm)
