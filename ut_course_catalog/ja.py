@@ -382,7 +382,7 @@ class UTCourseCatalog:
     session: Optional[aiohttp.ClientSession]
     _logger: Logger
 
-    def __init__(self, logger_level: int = 20) -> None:
+    def __init__(self, logger_level: int = 10) -> None:
         self.session = None
         self._logger = getLogger(__name__)
         self._logger.setLevel(logger_level)
@@ -789,15 +789,24 @@ class UTCourseCatalog:
         Iterator[AsyncIterable[Details]]
             Async iterable of details
         """
+        
+        pbar = tqdm(disable=not use_tqdm)
+
+        async def on_initial_request_wrapper(search_result: SearchResult):
+            pbar.total = search_result.total_items_count
+            if on_initial_request:
+                await await_if_future(on_initial_request(search_result))
+                
         async for item in self.fetch_search_all(
             params,
             interval_seconds=interval_seconds,
-            use_tqdm=use_tqdm,
-            on_initial_request=on_initial_request,
+            use_tqdm=False,
+            on_initial_request=on_initial_request_wrapper,
         ):
             wait_task = create_task(asyncio.sleep(interval_seconds))
             detail_task = create_task(self.retry(self.fetch_detail)(item.時間割コード, year))
             wait, detail = await asyncio.gather(wait_task, detail_task)
+            pbar.update(1)
             yield detail
 
     async def fetch_and_save_search_detail_all(
@@ -848,22 +857,14 @@ class UTCourseCatalog:
         self._logger.info(f"Saving to {filepath}")
         result = []
 
-        pbar = tqdm(disable=not use_tqdm)
-
-        async def on_initial_request_wrapper(search_result: SearchResult):
-            pbar.total = search_result.total_items_count
-            if on_initial_request:
-                await await_if_future(on_initial_request(search_result))
-
         async for detail in self.fetch_search_detail_all(
             params,
             interval_seconds=interval_seconds,
             year=year,
-            use_tqdm=False,
-            on_initial_request=on_initial_request_wrapper,
+            use_tqdm=use_tqdm,
+            on_initial_request=on_initial_request,
         ):
             result.append(detail)
             async with aiofiles.open(filename, "wb") as f:
                 await f.write(pickle.dumps(result))
-            pbar.update(1)
             yield detail
