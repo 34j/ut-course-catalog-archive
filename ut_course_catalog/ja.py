@@ -446,7 +446,8 @@ class UTCourseCatalog:
                 return cards.get(name, None)
 
             def get_card_text(name: str) -> Optional[str]:
-                if card := get_card(name):
+                card = get_card(name)
+                if card:
                     return _format_description(card.text)
                 return None
 
