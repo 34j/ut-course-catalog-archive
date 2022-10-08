@@ -8,9 +8,9 @@ from typing import Iterable, NamedTuple, Optional, TypeVar, Union
 import aiohttp
 from bs4 import BeautifulSoup, ResultSet, Tag
 
-from ut_course_catalog.common import Semester, Weekday
+from ut_course_catalog.common import Semester, Weekday, BASE_URL
 
-BASE_URL = "https://catalog.he.u-tokyo.ac.jp/"
+
 
 
 class Institution(Enum):
