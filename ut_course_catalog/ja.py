@@ -11,8 +11,6 @@ from bs4 import BeautifulSoup, ResultSet, Tag
 from ut_course_catalog.common import Semester, Weekday, BASE_URL
 
 
-
-
 class Institution(Enum):
     """Institution in the University of Tokyo."""
 
@@ -67,22 +65,172 @@ class Faculty(IntEnum):
             raise ValueError(f"'{cls.__name__}' enum not found for '{value}'")
 
 
+class ClassForm(Enum):
+    """
+    授業形態コード 	種別
+    L 	講義
+    S 	演習
+    E 	実験
+    P	実習/実技
+    T	卒業論文/卒業研究/卒業制作/論文指導/研究指導
+    Z	その他"""
+
+    講義 = "L"
+    演習 = "S"
+    実験 = "E"
+    実習 = "P"
+    卒業論文 = "T"
+    その他 = "Z"
+
+
+class Language(Enum):
+    """Language of a course."""
+
+    Japanese = "ja"
+    English = "en"
+    JapaneseAndEnglish = "ja,en"
+    OtherLanguagesToo = "other"
+    OnlyOtherLanguages = "only_other"
+    Others = "others"
+
+
+class CommonCode(str):
+    @property
+    def institution(self) -> Institution:
+        return {"C": Institution.学部前期課程, "F": Institution.学部後期課程, "G": Institution.大学院}[
+            self[0]
+        ]
+
+    @property
+    def faculty(self) -> Faculty:
+        """
+        学部名	学部名（英語）	開講学部コード
+        法学部 	Faculty of Law	LA
+        医学部	Faculty of Medicine	ME
+        工学部	Faculty of Engineering	EN
+        文学部	Faculty of Letters 	LE
+        理学部	Faculty of Science 	SC
+        農学部	Faculty of Agriculture	AG
+        経済学部	Faculty of Economics	EC
+        教養学部	College of Arts and Sciences	AS
+        教育学部	Faculty of Education	ED
+        薬学部	Faculty of Pharmaceutical Sciences	PH
+        人文社会系研究科	Graduate School of Humanities and Sociology	HS
+        教育学研究科	Graduate School of Education	ED
+        法学政治学研究科	Graduate Schools for Law and Politics	LP
+        経済学研究科	Graduate School of Economics	EC
+        総合文化研究科	Graduate School of Arts and Sciences	AS
+        理学系研究科	Graduate School of Science	SC
+        工学系研究科	Graduate School of Engineering	EN
+        農学生命科学研究科	Graduate School of Agricultural and Life Sciences	AG
+        医学系研究科	Graduate School of Medicine	ME
+        薬学系研究科	Graduate School of Pharmaceutical Sciences	PH
+        数理科学研究科	Graduate School of Mathematical Sciences	MA
+        新領域創成科学研究科	Graduate School of Frontier Sciences	FS
+        情報理工学系研究科	Graduate School of Information Science and Technology	IF
+        学際情報学府	Graduate School of Interdisciplinary Information Studies	II
+        公共政策大学院(公共政策学連携研究部・教育部)	Graduate School of Public Policy	PP
+        """
+        code = self[1:3]
+        g_faculties = {
+                "HS": Faculty.人文社会系研究科,
+                "LP": Faculty.法学政治学研究科,
+                "AS": Faculty.総合文化研究科,
+                "SC": Faculty.理学系研究科,
+                "EN": Faculty.工学系研究科,
+                "AG": Faculty.農学生命科学研究科,
+                "ME": Faculty.医学系研究科,
+                "PH": Faculty.薬学系研究科,
+                "MA": Faculty.数理科学研究科,
+                "FS": Faculty.新領域創成科学研究科,
+                "IF": Faculty.情報理工学研究科,
+                "II": Faculty.学際情報学府,
+                "PP": Faculty.公共政策学教育部,
+            }
+        ug_faculties = {
+                "LA": Faculty.法学部,
+                "ME": Faculty.医学部,
+                "EN": Faculty.工学部,
+                "LE": Faculty.文学部,
+                "SC": Faculty.理学部,
+                "AG": Faculty.農学部,
+                "EC": Faculty.経済学部,
+                "AS": Faculty.教養学部,
+                "ED": Faculty.教育学部,
+                "PH": Faculty.薬学部,
+            }
+        if self.institution == Institution.大学院:
+            if code in g_faculties:
+                return g_faculties[code]
+            if code in ug_faculties:
+                return ug_faculties[code]
+        else:
+            if code in ug_faculties:
+                return ug_faculties[code]
+            if code in g_faculties:
+                return g_faculties[code]
+        raise ParserError(f"Unknown faculty code: {code}")
+
+    @property
+    def department(self) -> str:
+        return self[4:6]
+
+    @property
+    def level(self) -> int:
+        return int(self[6])
+
+    @property
+    def reference_number(self) -> int:
+        return int(self[7:10])
+
+    @property
+    def class_form(self) -> ClassForm:
+        """
+        授業形態コード 	種別
+        L 	講義
+        S 	演習
+        E 	実験
+        P	実習/実技
+        T	卒業論文/卒業研究/卒業制作/論文指導/研究指導
+        Z	その他"""
+
+        return {
+            "L": ClassForm.講義,
+            "S": ClassForm.演習,
+            "E": ClassForm.実験,
+            "P": ClassForm.実習,
+            "T": ClassForm.卒業論文,
+            "Z": ClassForm.その他,
+        }[self[10]]
+
+    @property
+    def language(self) -> Language:
+        return {
+            1: Language.Japanese,
+            2: Language.JapaneseAndEnglish,
+            3: Language.English,
+            4: Language.OtherLanguagesToo,
+            5: Language.OnlyOtherLanguages,
+            9: Language.Others,
+        }[int(self[11])]
+
+
 class SearchResultItem(NamedTuple):
     """Summary of a course in search results. Call `fetch_details` to get more information."""
 
     時間割コード: str
-    共通科目コード: str
+    共通科目コード: CommonCode
     コース名: str
     教員: str
-    学期: Iterable[Semester]
-    曜限: Iterable[tuple[Weekday, int]]
+    学期: set[Semester]
+    曜限: set[tuple[Weekday, int]]
     ねらい: str
 
 
 class SearchResult(NamedTuple):
     """Result of a search query."""
 
-    items: Iterable[SearchResultItem]
+    items: list[SearchResultItem]
     current_items_first_index: int
     current_items_last_index: int
     current_items_count: int
@@ -95,11 +243,11 @@ class Details(NamedTuple):
     """Details of a course. Contains all available information for a course on the website. (UTAS may have more information)"""
 
     時間割コード: str
-    共通科目コード: str
+    共通科目コード: CommonCode
     コース名: str
     教員: str
-    学期: Iterable[Semester]
-    曜限: Iterable[tuple[Weekday, int]]
+    学期: set[Semester]
+    曜限: set[tuple[Weekday, int]]
     ねらい: str
     教室: str
     単位数: int
@@ -354,15 +502,15 @@ class UTCourseCatalog:
                             ).text
                         ),
                         時間割コード=code_cell_children[1].text,
-                        共通科目コード=code_cell_children[3].text,
+                        共通科目コード=CommonCode(code_cell_children[3].text),
                         コース名=get_cell_text("name"),
                         教員=get_cell_text("lecturer"),
-                        学期=[
+                        学期=set([
                             Semester(el.text.replace(" ", "").replace("\n", ""))
                             for el in get_cell("semester").find_all(
                                 class_="catalog-semester-icon"
                             )
-                        ],
+                        ]),
                         曜限=set(_parse_weekday_period(get_cell_text("period"))),
                     )
 
@@ -457,13 +605,13 @@ class UTCourseCatalog:
             # return the result
             return Details(
                 時間割コード=code_cell_children[1].text,
-                共通科目コード=code_cell_children[3].text,
+                共通科目コード=CommonCode(code_cell_children[3].text),
                 コース名=get_cell1("name"),
                 教員=get_cell1("lecturer"),
-                学期=[
+                学期=set([
                     Semester(el.text.replace(" ", "").replace("\n", ""))
                     for el in cells1_parent.find_all(class_="catalog-semester-icon")
-                ],
+                ]),
                 曜限=_parse_weekday_period(get_cell1("period")),
                 教室=get_cell2(0),
                 単位数=int(get_cell2(1)),
@@ -483,3 +631,11 @@ class UTCourseCatalog:
                     ).text
                 ),
             )
+
+    async def fetch_common_code(self, 時間割コード: str) -> CommonCode:
+        result = await self.fetch_search(SearchParams(keyword=時間割コード))
+        return result.items[0].共通科目コード
+    
+    async def fetch_code(self, 共通科目コード: str) -> str:
+        result = await self.fetch_search(SearchParams(keyword=共通科目コード))
+        return result.items[0].時間割コード
