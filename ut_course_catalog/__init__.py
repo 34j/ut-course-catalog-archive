@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Top-level package for ut-course-catalog."""
 
 __author__ = """34j"""
