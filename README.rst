@@ -25,11 +25,11 @@ Python package to fetch UTokyo Online Course Catalogue.
 Installation
 ------------
 
-Install ``ut_course_catalog`` using ``pip``:
+Install ``ut-course-catalog`` using ``pip``:
 
 .. code-block:: shell
         
-        pip install ut_course_catalog
+        pip install ut-course-catalog
 
 
 Features
