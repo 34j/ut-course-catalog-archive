@@ -43,3 +43,4 @@ class TestJa(IsolatedAsyncioTestCase):
     async def test_fetch_code(self) -> None:
         code = await self.catalog.fetch_code("FSC-MA2301L1")
         self.assertEqual('0505001', code)
+    

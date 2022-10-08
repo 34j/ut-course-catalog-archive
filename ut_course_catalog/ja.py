@@ -1,12 +1,28 @@
 from __future__ import annotations
+from asyncio import create_task
+import asyncio
+import hashlib
+from inspect import isawaitable
 import math
+import pickle
 import re
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import Iterable, NamedTuple, Optional, TypeVar, Union
+from typing import (
+    AsyncIterable,
+    Awaitable,
+    Callable,
+    Iterable,
+    NamedTuple,
+    Optional,
+    TypeVar,
+    Union,
+)
+import aiofiles
 
 import aiohttp
 from bs4 import BeautifulSoup, ResultSet, Tag
+from tqdm import tqdm, trange
 
 from ut_course_catalog.common import Semester, Weekday, BASE_URL
 
@@ -133,32 +149,32 @@ class CommonCode(str):
         """
         code = self[1:3]
         g_faculties = {
-                "HS": Faculty.人文社会系研究科,
-                "LP": Faculty.法学政治学研究科,
-                "AS": Faculty.総合文化研究科,
-                "SC": Faculty.理学系研究科,
-                "EN": Faculty.工学系研究科,
-                "AG": Faculty.農学生命科学研究科,
-                "ME": Faculty.医学系研究科,
-                "PH": Faculty.薬学系研究科,
-                "MA": Faculty.数理科学研究科,
-                "FS": Faculty.新領域創成科学研究科,
-                "IF": Faculty.情報理工学研究科,
-                "II": Faculty.学際情報学府,
-                "PP": Faculty.公共政策学教育部,
-            }
+            "HS": Faculty.人文社会系研究科,
+            "LP": Faculty.法学政治学研究科,
+            "AS": Faculty.総合文化研究科,
+            "SC": Faculty.理学系研究科,
+            "EN": Faculty.工学系研究科,
+            "AG": Faculty.農学生命科学研究科,
+            "ME": Faculty.医学系研究科,
+            "PH": Faculty.薬学系研究科,
+            "MA": Faculty.数理科学研究科,
+            "FS": Faculty.新領域創成科学研究科,
+            "IF": Faculty.情報理工学研究科,
+            "II": Faculty.学際情報学府,
+            "PP": Faculty.公共政策学教育部,
+        }
         ug_faculties = {
-                "LA": Faculty.法学部,
-                "ME": Faculty.医学部,
-                "EN": Faculty.工学部,
-                "LE": Faculty.文学部,
-                "SC": Faculty.理学部,
-                "AG": Faculty.農学部,
-                "EC": Faculty.経済学部,
-                "AS": Faculty.教養学部,
-                "ED": Faculty.教育学部,
-                "PH": Faculty.薬学部,
-            }
+            "LA": Faculty.法学部,
+            "ME": Faculty.医学部,
+            "EN": Faculty.工学部,
+            "LE": Faculty.文学部,
+            "SC": Faculty.理学部,
+            "AG": Faculty.農学部,
+            "EC": Faculty.経済学部,
+            "AS": Faculty.教養学部,
+            "ED": Faculty.教育学部,
+            "PH": Faculty.薬学部,
+        }
         if self.institution == Institution.大学院:
             if code in g_faculties:
                 return g_faculties[code]
@@ -292,6 +308,9 @@ class SearchParams:
     分野_NDC: OptionalIterableOrType[str] = None
     """AND search, not OR."""
 
+    def id(self) -> str:
+        return hashlib.sha256(str(self).encode()).hexdigest()
+
 
 def _format(text: str) -> str:
     """Utility function for removing unnecessary whitespaces."""
@@ -332,6 +351,12 @@ def _parse_weekday_period(period_text: str) -> set[tuple[Weekday, int]]:
     for item in period_texts:
         result.add(parse_one(item))
     return result
+
+
+async def await_if_future(obj: object) -> object:
+    if isawaitable(obj):
+        return await obj
+    return obj
 
 
 class ParserError(Exception):
@@ -505,12 +530,14 @@ class UTCourseCatalog:
                         共通科目コード=CommonCode(code_cell_children[3].text),
                         コース名=get_cell_text("name"),
                         教員=get_cell_text("lecturer"),
-                        学期=set([
-                            Semester(el.text.replace(" ", "").replace("\n", ""))
-                            for el in get_cell("semester").find_all(
-                                class_="catalog-semester-icon"
-                            )
-                        ]),
+                        学期=set(
+                            [
+                                Semester(el.text.replace(" ", "").replace("\n", ""))
+                                for el in get_cell("semester").find_all(
+                                    class_="catalog-semester-icon"
+                                )
+                            ]
+                        ),
                         曜限=set(_parse_weekday_period(get_cell_text("period"))),
                     )
 
@@ -608,10 +635,12 @@ class UTCourseCatalog:
                 共通科目コード=CommonCode(code_cell_children[3].text),
                 コース名=get_cell1("name"),
                 教員=get_cell1("lecturer"),
-                学期=set([
-                    Semester(el.text.replace(" ", "").replace("\n", ""))
-                    for el in cells1_parent.find_all(class_="catalog-semester-icon")
-                ]),
+                学期=set(
+                    [
+                        Semester(el.text.replace(" ", "").replace("\n", ""))
+                        for el in cells1_parent.find_all(class_="catalog-semester-icon")
+                    ]
+                ),
                 曜限=_parse_weekday_period(get_cell1("period")),
                 教室=get_cell2(0),
                 単位数=int(get_cell2(1)),
@@ -633,9 +662,183 @@ class UTCourseCatalog:
             )
 
     async def fetch_common_code(self, 時間割コード: str) -> CommonCode:
+        """Fetch common code of a course from its time table code.
+
+        Returns
+        -------
+        CommonCode
+            Common code of the course
+        """
         result = await self.fetch_search(SearchParams(keyword=時間割コード))
         return result.items[0].共通科目コード
-    
+
     async def fetch_code(self, 共通科目コード: str) -> str:
+        """Fetch time table code of a course from its common code.
+
+        Returns
+        -------
+        str
+            Time table code of the course
+        """
         result = await self.fetch_search(SearchParams(keyword=共通科目コード))
         return result.items[0].時間割コード
+
+    async def fetch_search_all(
+        self,
+        params: SearchParams,
+        *,
+        interval_seconds: float = 1,
+        use_tqdm: bool = True,
+        on_initial_request: Optional[
+            Callable[[SearchResult], Optional[Awaitable]]
+        ] = None,
+    ) -> AsyncIterable[SearchResultItem]:
+        """Fetch all search results by repeatedly calling `fetch_search`.
+
+        Parameters
+        ----------
+        params : SearchParams
+            Search parameters
+        interval_seconds : float, optional
+            Interval between requests, by default 1
+        use_tqdm : bool, optional
+            Whether to use tqdm, by default True
+        on_initial_request : Optional[Callable[[SearchResult], Optional[Awaitable]]], optional
+            Callback function to be called on the initial request, by default None
+
+        Returns
+        -------
+        AsyncIterable[SearchResultItem]
+            Async iterable of search results
+
+        Yields
+        ------
+        Iterator[AsyncIterable[SearchResultItem]]
+            Async iterable of search results
+        """
+        result = await self.fetch_search(params)
+        if on_initial_request:
+            await await_if_future(on_initial_request(result))
+
+        for item in result.items:
+            yield item
+
+        for page in trange(2, result.total_pages + 1, disable=not use_tqdm):
+            wait_task = create_task(asyncio.sleep(interval_seconds))
+            result_task = create_task(self.fetch_search(params, page))
+            wait, result = await asyncio.gather(wait_task, result_task)
+            for item in result.items:
+                yield item
+
+    async def fetch_search_detail_all(
+        self,
+        params: SearchParams,
+        *,
+        interval_seconds: float = 1,
+        year: int = 2022,
+        use_tqdm: bool = True,
+        on_initial_request: Optional[
+            Callable[[SearchResult], Optional[Awaitable]]
+        ] = None,
+    ) -> AsyncIterable[Details]:
+        """Fetch all search results by repeatedly calling `fetch_search` and `fetch_detail`.
+
+        Parameters
+        ----------
+        params : SearchParams
+            Search parameters
+        interval_seconds : float, optional
+            Interval between requests, by default 1
+        year : int, optional
+            Year of the course, by default 2022
+        use_tqdm : bool, optional
+            Whether to use tqdm, by default True
+        on_initial_request : Optional[Callable[[SearchResult], Optional[Awaitable]]], optional
+            Callback function to be called on the initial request, by default None
+
+        Returns
+        -------
+        AsyncIterable[Details]
+            Async iterable of details
+
+        Yields
+        ------
+        Iterator[AsyncIterable[Details]]
+            Async iterable of details
+        """
+        async for item in self.fetch_search_all(
+            params,
+            interval_seconds=interval_seconds,
+            use_tqdm=use_tqdm,
+            on_initial_request=on_initial_request,
+        ):
+            wait_task = create_task(asyncio.sleep(interval_seconds))
+            detail_task = create_task(self.fetch_detail(item.時間割コード, year))
+            wait, detail = await asyncio.gather(wait_task, detail_task)
+            yield detail
+
+    async def fetch_and_save_search_detail_all(
+        self,
+        params: SearchParams,
+        *,
+        year: int = 2022,
+        filename: Optional[str] = None,
+        interval_seconds: float = 1,
+        use_tqdm: bool = True,
+        on_initial_request: Optional[
+            Callable[[SearchResult], Optional[Awaitable]]
+        ] = None,
+    ) -> AsyncIterable[Details]:
+        """Fetch all search results by repeatedly calling `fetch_search` and `fetch_detail` and save them to a PKL file.
+        The filename is params.id() + ".pkl" if not specified.
+
+        Parameters
+        ----------
+        params : SearchParams
+            Search parameters
+        year : int, optional
+            Year of the course, by default 2022
+        filename : Optional[str], optional
+            Filename to save the results, by default None. If None, the filename is params.id() + ".pkl".
+        interval_seconds : float, optional
+            Interval between requests, by default 1
+        use_tqdm : bool, optional
+            Whether to use tqdm, by default True
+        on_initial_request : Optional[Callable[[SearchResult], Optional[Awaitable]]], optional
+            Callback function to be called on the initial request, by default None
+
+        Returns
+        -------
+        AsyncIterable[Details]
+            Async iterable of details
+
+        Yields
+        ------
+        Iterator[AsyncIterable[Details]]
+            Async iterable of details
+        """
+        if not filename:
+            filename = params.id()
+        if not filename.endswith(".pkl"):
+            filename += ".pkl"
+        result = []
+
+        pbar = tqdm(disable=not use_tqdm)
+
+        async def on_initial_request_wrapper(search_result: SearchResult):
+            pbar.total = search_result.total_items_count
+            if on_initial_request:
+                await await_if_future(on_initial_request(search_result))
+
+        async for detail in self.fetch_search_detail_all(
+            params,
+            interval_seconds=interval_seconds,
+            year=year,
+            use_tqdm=False,
+            on_initial_request=on_initial_request_wrapper,
+        ):
+            result.append(detail)
+            async with aiofiles.open(filename, "wb") as f:
+                await f.write(pickle.dumps(result))
+            pbar.update(1)
+            yield detail
