@@ -12,17 +12,26 @@ from enum import Enum
 from inspect import isawaitable
 from logging import Logger, getLogger
 from pathlib import Path
-from typing import (AsyncIterable, Awaitable, Callable, Iterable, NamedTuple,
-                    Optional, TypeVar, Union)
+from typing import (
+    AsyncIterable,
+    Awaitable,
+    Callable,
+    Iterable,
+    NamedTuple,
+    Optional,
+    TypeVar,
+    Union,
+)
 
 import aiofiles
 import aiohttp
 from bs4 import BeautifulSoup, ResultSet, Tag
+from pandas import DataFrame
 from tenacity import WrappedFn, retry
 from tenacity.before_sleep import before_sleep_log
 from tenacity.stop import stop_after_attempt, stop_after_delay
 from tenacity.wait import wait_exponential
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from ut_course_catalog.common import BASE_URL, Semester, Weekday
 
@@ -381,7 +390,7 @@ class UTCourseCatalog:
     _rate_limitter: RateLimitter
 
     def __init__(
-        self, logger_level: int = 10, min_interval: Union[timedelta, int] = 1
+        self, logger_level: int = 0, min_interval: Union[timedelta, int] = 1
     ) -> None:
         self.session = None
         self._logger = getLogger(__name__)
@@ -559,6 +568,15 @@ class UTCourseCatalog:
                         曜限=set(_parse_weekday_period(get_cell_text("period"))),
                     )
 
+            items = list(get_items())
+            if page != total_pages:
+                if len(items) != 10:
+                    raise ParserError("items count is not 10")
+                if len(items) != current_items_count:
+                    raise ParserError("items count is not current_items_count")
+            if page != current_items_first_index // 10 + 1:
+                raise ParserError("page number is not correct")
+
             return SearchResult(
                 items=list(get_items()),
                 total_items_count=total_items_count,
@@ -713,7 +731,6 @@ class UTCourseCatalog:
         self,
         params: SearchParams,
         *,
-        interval_seconds: float = 1,
         use_tqdm: bool = True,
         on_initial_request: Optional[
             Callable[[SearchResult], Optional[Awaitable]]
@@ -725,8 +742,6 @@ class UTCourseCatalog:
         ----------
         params : SearchParams
             Search parameters
-        interval_seconds : float, optional
-            Interval between requests, by default 1
         use_tqdm : bool, optional
             Whether to use tqdm, by default True
         on_initial_request : Optional[Callable[[SearchResult], Optional[Awaitable]]], optional
@@ -742,17 +757,29 @@ class UTCourseCatalog:
         Iterator[AsyncIterable[SearchResultItem]]
             Async iterable of search results
         """
+        pbar = tqdm(disable=not use_tqdm)
         result = await self.fetch_search(params)
+        pbar.update()
+
         if on_initial_request:
             await await_if_future(on_initial_request(result))
 
         for item in result.items:
             yield item
 
-        for page in trange(2, result.total_pages + 1, disable=not use_tqdm):
-            wait_task = create_task(asyncio.sleep(interval_seconds))
-            result_task = create_task(self.retry(self.fetch_search)(params, page))
-            wait, result = await asyncio.gather(wait_task, result_task)
+        pbar.total = result.total_pages
+        tasks = []
+        for page in range(2, result.total_pages + 1):
+
+            async def inner(page):
+                search = await self.retry(self.fetch_search)(params, page)
+                pbar.update(1)
+                return search
+
+            result_task = create_task(inner(page))
+            tasks.append(result_task)
+        results = await asyncio.gather(*tasks)
+        for result in results:
             for item in result.items:
                 yield item
 
@@ -760,21 +787,19 @@ class UTCourseCatalog:
         self,
         params: SearchParams,
         *,
-        interval_seconds: float = 1,
         year: int = 2022,
         use_tqdm: bool = True,
         on_initial_request: Optional[
             Callable[[SearchResult], Optional[Awaitable]]
         ] = None,
-    ) -> AsyncIterable[Details]:
+        on_detail_request: Optional[Callable[[Details], Optional[Awaitable]]] = None,
+    ) -> Iterable[Details]:
         """Fetch all search results by repeatedly calling `fetch_search` and `fetch_detail`.
 
         Parameters
         ----------
         params : SearchParams
             Search parameters
-        interval_seconds : float, optional
-            Interval between requests, by default 1
         year : int, optional
             Year of the course, by default 2022
         use_tqdm : bool, optional
@@ -800,17 +825,34 @@ class UTCourseCatalog:
             if on_initial_request:
                 await await_if_future(on_initial_request(search_result))
 
-        async for item in self.fetch_search_all(
-            params,
-            interval_seconds=interval_seconds,
-            use_tqdm=False,
-            on_initial_request=on_initial_request_wrapper,
-        ):
-            wait_task = create_task(asyncio.sleep(interval_seconds))
-            detail_task = create_task(self.retry(self.fetch_detail)(item.時間割コード, year))
-            wait, detail = await asyncio.gather(wait_task, detail_task)
-            pbar.update(1)
-            yield detail
+        tasks = []
+        items = [
+            item
+            async for item in self.fetch_search_all(
+                params,
+                use_tqdm=True,
+                on_initial_request=on_initial_request_wrapper,
+            )
+        ]
+        s = asyncio.Semaphore(10)
+        for item in items:
+
+            async def inner(item):
+                async with s:
+                    try:
+                        details = await self.retry(self.fetch_detail)(item.時間割コード, year)
+                    except Exception as e:
+                        self._logger.error(e)
+                        return None
+                    pbar.update()
+                    if on_detail_request:
+                        await await_if_future(on_detail_request(details))
+                    return details
+
+            detail_task = create_task(inner(item))
+            tasks.append(detail_task)
+        results = await asyncio.gather(*tasks)
+        return results
 
     async def fetch_and_save_search_detail_all(
         self,
@@ -818,12 +860,11 @@ class UTCourseCatalog:
         *,
         year: int = 2022,
         filename: Optional[str] = None,
-        interval_seconds: float = 1,
         use_tqdm: bool = True,
         on_initial_request: Optional[
             Callable[[SearchResult], Optional[Awaitable]]
         ] = None,
-    ) -> AsyncIterable[Details]:
+    ) -> Iterable[Details]:
         """Fetch all search results by repeatedly calling `fetch_search` and `fetch_detail` and save them to a PKL file.
         The filename is params.id() + ".pkl" if not specified.
 
@@ -835,8 +876,6 @@ class UTCourseCatalog:
             Year of the course, by default 2022
         filename : Optional[str], optional
             Filename to save the results, by default None. If None, the filename is params.id() + ".pkl".
-        interval_seconds : float, optional
-            Interval between requests, by default 1
         use_tqdm : bool, optional
             Whether to use tqdm, by default True
         on_initial_request : Optional[Callable[[SearchResult], Optional[Awaitable]]], optional
@@ -858,19 +897,47 @@ class UTCourseCatalog:
             filename += ".pkl"
         filepath = Path(filename)
         self._logger.info(f"Saving to {filepath}")
-        result = []
-
-        async for detail in self.fetch_search_detail_all(
+        result = await self.fetch_search_detail_all(
             params,
-            interval_seconds=interval_seconds,
             year=year,
             use_tqdm=use_tqdm,
             on_initial_request=on_initial_request,
-        ):
-            result.append(detail)
-            async with aiofiles.open(filename, "wb") as f:
-                await f.write(pickle.dumps(result))
-            yield detail
+        )
+        async with aiofiles.open(filename, "wb") as f:
+            await f.write(pickle.dumps(result))
+        return result
 
+    async def fetch_and_save_search_detail_all_pandas(
+        self,
+        params: SearchParams,
+        *,
+        year: int = 2022,
+        filename: Optional[str] = None,
+        use_tqdm: bool = True,
+        on_initial_request: Optional[
+            Callable[[SearchResult], Optional[Awaitable]]
+        ] = None,
+    ) -> DataFrame:
+        data = await self.fetch_and_save_search_detail_all(
+            params,
+            year=year,
+            use_tqdm=use_tqdm,
+            on_initial_request=on_initial_request,
+        )
+        from .pandas import to_dataframe
 
-from datetime import timedelta
+        df = to_dataframe(data)
+        if not filename:
+            filename = params.id() + "_pandas"
+        if not filename.endswith(".pkl"):
+            filename += ".pkl"
+        filepath = Path(filename)
+        self._logger.info(f"Saving to {filepath}")
+        df.to_pickle(filename)
+        return df
+
+    def read_pandas(self, params) -> DataFrame:
+        import pandas as pd
+
+        filename = params.id() + "_pandas.pkl"
+        return pd.read_pickle(filename)

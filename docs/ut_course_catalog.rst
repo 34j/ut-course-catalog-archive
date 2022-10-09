@@ -24,3 +24,11 @@ ut\_course\_catalog.ja module
    :members:
    :undoc-members:
    :show-inheritance:
+
+ut\_course\_catalog.pandas module
+---------------------------------
+
+.. automodule:: ut_course_catalog.pandas
+   :members:
+   :undoc-members:
+   :show-inheritance:
