@@ -1,38 +1,30 @@
 from __future__ import annotations
-from asyncio import create_task
+
 import asyncio
-from asyncio.log import logger
-from decimal import Decimal
 import hashlib
-from inspect import isawaitable
-from logging import Logger, getLogger
 import math
-from pathlib import Path
 import pickle
 import re
+from asyncio import create_task
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import Enum
-from typing import (
-    AsyncIterable,
-    Awaitable,
-    Callable,
-    Iterable,
-    NamedTuple,
-    Optional,
-    TypeVar,
-    Union,
-)
-import aiofiles
+from inspect import isawaitable
+from logging import Logger, getLogger
+from pathlib import Path
+from typing import (AsyncIterable, Awaitable, Callable, Iterable, NamedTuple,
+                    Optional, TypeVar, Union)
 
+import aiofiles
 import aiohttp
 from bs4 import BeautifulSoup, ResultSet, Tag
 from tenacity import WrappedFn, retry
+from tenacity.before_sleep import before_sleep_log
 from tenacity.stop import stop_after_attempt, stop_after_delay
 from tenacity.wait import wait_exponential
-from tenacity.before_sleep import before_sleep_log
 from tqdm import tqdm, trange
 
-from ut_course_catalog.common import Semester, Weekday, BASE_URL
+from ut_course_catalog.common import BASE_URL, Semester, Weekday
 
 
 class Institution(Enum):
@@ -376,16 +368,25 @@ class ParserError(Exception):
     pass
 
 
+from datetime import timedelta
+
+from .common import RateLimitter
+
+
 class UTCourseCatalog:
     """A parser for the [UTokyo Online Course Catalogue](https://catalog.he.u-tokyo.ac.jp)."""
 
     session: Optional[aiohttp.ClientSession]
     _logger: Logger
+    _rate_limitter: RateLimitter
 
-    def __init__(self, logger_level: int = 10) -> None:
+    def __init__(
+        self, logger_level: int = 10, min_interval: Union[timedelta, int] = 1
+    ) -> None:
         self.session = None
         self._logger = getLogger(__name__)
         self._logger.setLevel(logger_level)
+        self._rate_limitter = RateLimitter(min_interval=min_interval)
 
     async def __aenter__(self):
         if self.session:
@@ -479,6 +480,7 @@ class UTCourseCatalog:
             _params["facet"] = str(facet).replace("'", '"').replace(" ", "")
 
         # fetch website
+        await self._rate_limitter.wait()
         async with self.session.get(BASE_URL + "result", params=_params) as response:
             # parse website
             soup = BeautifulSoup(await response.text(), "html.parser")
@@ -590,6 +592,7 @@ class UTCourseCatalog:
         self._check_client()
         assert self.session
 
+        await self._rate_limitter.wait()
         async with self.session.get(
             BASE_URL + "detail", params={"code": code, "year": str(year)}
         ) as response:
@@ -789,14 +792,14 @@ class UTCourseCatalog:
         Iterator[AsyncIterable[Details]]
             Async iterable of details
         """
-        
+
         pbar = tqdm(disable=not use_tqdm)
 
         async def on_initial_request_wrapper(search_result: SearchResult):
             pbar.total = search_result.total_items_count
             if on_initial_request:
                 await await_if_future(on_initial_request(search_result))
-                
+
         async for item in self.fetch_search_all(
             params,
             interval_seconds=interval_seconds,
@@ -868,3 +871,6 @@ class UTCourseCatalog:
             async with aiofiles.open(filename, "wb") as f:
                 await f.write(pickle.dumps(result))
             yield detail
+
+
+from datetime import timedelta
