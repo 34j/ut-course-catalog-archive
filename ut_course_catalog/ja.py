@@ -358,12 +358,14 @@ def _parse_weekday_period(period_text: str) -> set[tuple[Weekday, int]]:
         reres = re.search(r"\d+", period)
         if not reres:
             #raise ValueError(f"Invalid period: {period}")
-            return set()
+            return None
         p = int(reres.group())
         return w, p
 
     result = set()
     for item in period_texts:
+        if not item:
+            return set()
         result.add(parse_one(item))
     return result
 
@@ -939,6 +941,11 @@ class UTCourseCatalog:
             from .pandas import to_dataframe
 
             df = to_dataframe(data)
+        except Exception as e:
+            self._logger.error(e)
+            self._logger.error('Returning raw data instead of pandas dataframe.')
+            return data # type: ignore
+        try:
             if not filename:
                 filename = params.id()
             if not filename.endswith(".pkl"):
@@ -950,8 +957,7 @@ class UTCourseCatalog:
             df.to_pickle(filename)
         except Exception as e:
             self._logger.error(e)
-            self._logger.error('Returning raw data instead of pandas dataframe.')
-            return data # type: ignore
+            self._logger.error(f"Skipping saving to {filepath}")
         return df
 
     def read_pandas(self, params) -> DataFrame:
