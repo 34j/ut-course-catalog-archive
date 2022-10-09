@@ -73,7 +73,7 @@ class Faculty(Enum):
     薬学系研究科 = 20
     数理科学研究科 = 21
     新領域創成科学研究科 = 22
-    情報理工学研究科 = 23
+    情報理工学系研究科 = 23
     学際情報学府 = 24
     公共政策学教育部 = 25
     教養学部前期課程 = 26
@@ -357,7 +357,8 @@ def _parse_weekday_period(period_text: str) -> set[tuple[Weekday, int]]:
         w = Weekday([weekday in period for weekday in list("月火水木金土日")].index(True))
         reres = re.search(r"\d+", period)
         if not reres:
-            raise ValueError(f"Invalid period: {period}")
+            #raise ValueError(f"Invalid period: {period}")
+            return set()
         p = int(reres.group())
         return w, p
 
@@ -772,7 +773,11 @@ class UTCourseCatalog:
         for page in range(2, result.total_pages + 1):
 
             async def inner(page):
-                search = await self.retry(self.fetch_search)(params, page)
+                try:
+                    search = await self.retry(self.fetch_search)(params, page)
+                except:
+                    self._logger.error(f"Failed to fetch page {page}")
+                    return None
                 pbar.update(1)
                 return search
 
@@ -780,8 +785,9 @@ class UTCourseCatalog:
             tasks.append(result_task)
         results = await asyncio.gather(*tasks)
         for result in results:
-            for item in result.items:
-                yield item
+            if result:
+                for item in result.items:
+                    yield item
 
     async def fetch_search_detail_all(
         self,
@@ -925,18 +931,23 @@ class UTCourseCatalog:
             on_initial_request=on_initial_request,
             filename=filename,
         )
-        from .pandas import to_dataframe
+        try:
+            from .pandas import to_dataframe
 
-        df = to_dataframe(data)
-        if not filename:
-            filename = params.id()
-        if not filename.endswith(".pkl"):
-            filename += ".pandas.pkl"
-        else:
-            filename = filename.replace(".pkl", ".pandas.pkl")
-        filepath = Path(filename)
-        self._logger.info(f"Saving to {filepath}")
-        df.to_pickle(filename)
+            df = to_dataframe(data)
+            if not filename:
+                filename = params.id()
+            if not filename.endswith(".pkl"):
+                filename += ".pandas.pkl"
+            else:
+                filename = filename.replace(".pkl", ".pandas.pkl")
+            filepath = Path(filename)
+            self._logger.info(f"Saving to {filepath}")
+            df.to_pickle(filename)
+        except Exception as e:
+            self._logger.error(e)
+            self._logger.error('Returning raw data instead of pandas dataframe.')
+            return data # type: ignore
         return df
 
     def read_pandas(self, params) -> DataFrame:
