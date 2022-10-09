@@ -205,8 +205,8 @@ class CommonCode(str):
         return int(self[6])
 
     @property
-    def reference_number(self) -> int:
-        return int(self[7:10])
+    def reference_number(self) -> str:
+        return self[7:10]
 
     @property
     def class_form(self) -> ClassForm:
@@ -324,7 +324,7 @@ class SearchParams:
 def parse_department(faculty: Faculty, department_code: str):
     d = {
         Faculty.教養学部前期課程: {
-            "": """
+            "for_copilot": """
 基礎科目 Foundation Courses FC
 展開科目 Intermediate Courses IC
 総合科目 Integrated Courses GC
@@ -359,7 +359,7 @@ PT""",
             "PT": "主題科目(PEAK)",
         },
         Faculty.法学部: {
-            "": """学科等名 学科等名（英語） 「開講学科等」コード
+            "for_copilot": """学科等名 学科等名（英語） 「開講学科等」コード
 共通科目 Common ＣＯ
 実定法系科目 Positive Law ＰＬ
 基礎法学系科目 Basic Law ＢＬ
@@ -375,7 +375,7 @@ PT""",
         },
         Faculty.医学部: {"ME": "医学科", "IE": "健康総合科学科"},
         Faculty.工学部: {
-            "": """学科等名 学科等名（英語）
+            "for_copilot": """学科等名 学科等名（英語）
 共通科目 Common Courses
 日本語教育部門 Japanese Language Class
 社会基盤学科 Department of Civil Engineering
@@ -454,7 +454,7 @@ SC
             "SC": "知能社会システムコース",
         },
         Faculty.文学部: {
-            "": """人文学科 Humanities HU
+            "for_copilot": """人文学科 Humanities HU
 専修課程以外 XX""",
             "HU": "人文学科",
             "XX": "専修課程以外",
@@ -473,7 +473,7 @@ SC
             "CC": "理学部共通科目",
         },
         Faculty.農学部: {
-            "": """MC 0 生命化学・工学専修 Major in Biological Chemistry and
+            "for_copilot": """MC 0 生命化学・工学専修 Major in Biological Chemistry and
 
 Biotechnology
 
@@ -525,7 +525,7 @@ MV 0 獣医学専修 Major in Veterinary Medical Sciences
             "MV": "獣医学専修",
         },
         Faculty.経済学部: {
-            "": """学科等名 学科等名（英語） 「開講学科等」コード
+            "for_copilot": """学科等名 学科等名（英語） 「開講学科等」コード
 経済学 Economics ＥＣ
 統計学 Statistics ＳＴ
 地域研究 Area Studies ＡＳ
@@ -542,7 +542,7 @@ MV 0 獣医学専修 Major in Veterinary Medical Sciences
             "WW": "その他",
         },
         Faculty.教養学部: {
-            "": """学科等名 学科等名（英語） 「開講学科等」コード
+            "for_copilot": """学科等名 学科等名（英語） 「開講学科等」コード
 言語共通科目 General Language Courses AA
 言語専門科目 Language Courses for Specific Disciplines BA
 教養学科 Department of Humanities and Social Sciences CA
@@ -566,7 +566,7 @@ HA
             "XA": "高度教養科目",
         },
         Faculty.教育学部: {
-            "": """学科等名 学科等名（英語） 「開講学科等」コード
+            "for_copilot": """学科等名 学科等名（英語） 「開講学科等」コード
 総合教育科学科
 Integrated Educational
 Sciences
@@ -613,7 +613,7 @@ Health Education
             "PH": "身体教育学コース",
         },
         Faculty.薬学部: {
-            "": """Department Name in English Code
+            "for_copilot": """Department Name in English Code
 薬科学科／薬学科 Pharmaceutical Sciences／Pharmacy ＳＨ
 薬科学科 Pharmaceutical Sciences ＰＳ
 薬学科 Pharmacy ＰＨ""",
@@ -633,7 +633,7 @@ Health Education
             "CC": "理学部共通科目",
         },
         Faculty.人文社会系研究科: {
-            "": """専攻等名 専攻等名（英語） 「開講専攻等」コード
+            "for_copilot": """専攻等名 専攻等名（英語） 「開講専攻等」コード
 総合教育科学専攻
 Department of
 Integrated
@@ -650,8 +650,25 @@ AS
             "AS": "学校教育高度化専攻",
             "ZZ": "その他",
         },
+        Faculty.教育学研究科: {
+            "for_copilot": """専攻等名 専攻等名（英語） 「開講専攻等」コード
+総合教育科学専攻
+Department of
+Integrated
+Educational
+IE
+学校教育高度化専攻
+Department of
+Advanced Research
+in School Education
+AS
+その他 Others ZZ""",
+            "IE": "総合教育科学専攻",
+            "AS": "学校教育高度化専攻",
+            "ZZ": "その他",
+        },
         Faculty.法学政治学研究科: {
-            "": """専攻等名 専攻等名（英語） 「開講専攻等」コード
+            "for_copilot": """専攻等名 専攻等名（英語） 「開講専攻等」コード
 総合法政専攻 School of Legal and Political Studies ＬＰ
 法曹養成専攻 School of Law ＬＳ""",
             "LP": "総合法政専攻",
@@ -661,7 +678,7 @@ AS
             "EC": "経済学研究科",
         },
         Faculty.総合文化研究科: {
-            "": """専攻等名 専攻等名（英語） 「開講専攻等」コード
+            "for_copilot": """専攻等名 専攻等名（英語） 「開講専攻等」コード
 言語情報科学専攻 Language and Information
 Sciences LI
 超域文化科学専攻 Interdisciplinary Cultural
@@ -737,7 +754,7 @@ Graduiertenkolleg IG
         },
         Faculty.工学系研究科: {"": ""},
         Faculty.農学生命科学研究科: {
-            "": """専攻等名 専攻等名（英語） 「開講専攻等」コード
+            "for_copilot": """専攻等名 専攻等名（英語） 「開講専攻等」コード
 共通 Common Course ＣＣ
 生産・環境生物学 Agricultural and Environmental
 Biology AB
@@ -777,7 +794,7 @@ Agricultural Development IP
         },
         Faculty.医学系研究科: {"ME": "医学系研究科"},
         Faculty.薬学系研究科: {
-            "": """専攻等名 専攻等名（英語） 「開講専攻等」コード
+            "for_copilot": """専攻等名 専攻等名（英語） 「開講専攻等」コード
 薬科学専攻／薬
 学専攻
 Pharmaceutical
@@ -794,7 +811,7 @@ Sciences ＰＳ
         },
         Faculty.数理科学研究科: {"MA": "数理科学研究科"},
         Faculty.情報理工学系研究科: {
-            "": """専攻等名 専攻等名（英語） 開講専攻等コード
+            "for_copilot": """専攻等名 専攻等名（英語） 開講専攻等コード
 コンピュータ科学 Computer Science ＣＳ
 数理情報学 Mathematical Informatics ＭＡ
 システム情報学 Information Physics & Computing ＩＰ
@@ -814,7 +831,7 @@ Engineering
             "CO": "共通科目",
         },
         Faculty.新領域創成科学研究科: {
-            "": """専攻等名 専攻等名（英語） 「開講専攻等」コード
+            "for_copilot": """専攻等名 専攻等名（英語） 「開講専攻等」コード
 全学開放科目 University-wide Open
 Courses OC
 新領域創成科学研究科共通科目 Common Courses CC
@@ -877,7 +894,7 @@ SS""",
             "SS": "サステイナビリティ学グローバルリーダー養成大学院プログラム",
         },
         Faculty.学際情報学府: {
-            "": """専攻等名（コース） 専攻等名（英語） 「開講専攻等」コード
+            "for_copilot": """専攻等名（コース） 専攻等名（英語） 「開講専攻等」コード
 社会情報学コース
 Socio-information and
 communication studies
@@ -919,7 +936,7 @@ Studies(Wide subject)
             "WS": "学際情報学専攻（横断）",
         },
         Faculty.公共政策学教育部: {
-            "": """専攻等名
+            "for_copilot": """専攻等名
 /Department
 「開講専攻等」コード
 /Department Code

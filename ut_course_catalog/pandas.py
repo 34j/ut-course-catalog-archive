@@ -3,6 +3,8 @@ import pandas as pd
 from enum import Enum, auto
 from wordcloud import WordCloud
 
+from ut_course_catalog.ja import parse_department
+
 
 def to_series(item: NamedTuple) -> pd.Series:
     return pd.Series(item._asdict())
@@ -96,5 +98,30 @@ def encode_scoring_method(texts: "pd.Series[str]") -> pd.DataFrame:
 
 
 def encode_common_code(common_codes: "pd.Series[CommonCode]") -> pd.DataFrame:
-    return pd.concat([common_codes.apply(lambda x: x.department)], axis=1)
+    d = common_codes.apply(lambda x: x.department)
+    d.name = "department"
+    r = common_codes.apply(
+        lambda x: x.reference_number[0] if x.reference_number else None
+    )
+    r.name = "reference_number"
+    return pd.concat(
+        [d, r],
+        names=["department", "reference_number"],
+        axis=1,
+    )
 
+
+def encode_department(
+    faculty: "pd.Series[Faculty]", common_codes: "pd.Series[CommonCode]"
+) -> pd.Series:
+    faculty.name = "faculty"
+    department_codes = common_codes.apply(lambda x: x.department)
+    department_codes.name = "department_code"
+    merged = pd.concat([faculty, department_codes], axis=1)
+    print(merged.columns)
+    return pd.Series(
+        [
+            parse_department(x["faculty"], x["department_code"])
+            for name, x in merged.iterrows()
+        ]
+    )

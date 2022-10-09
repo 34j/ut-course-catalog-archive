@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum, IntEnum
 
 BASE_URL = "https://catalog.he.u-tokyo.ac.jp/"
