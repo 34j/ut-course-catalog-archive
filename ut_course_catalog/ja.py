@@ -909,8 +909,12 @@ class UTCourseCatalog:
             use_tqdm=use_tqdm,
             on_initial_request=on_initial_request,
         )
-        async with aiofiles.open(filename, "wb") as f:
-            await f.write(pickle.dumps(result))
+        try:
+            async with aiofiles.open(filename, "wb") as f:
+                await f.write(pickle.dumps(result))
+        except Exception as e:
+            self._logger.error(e)
+            self._logger.error(f"Skipping saving to {filepath}")
         return result
 
     async def fetch_and_save_search_detail_all_pandas(
