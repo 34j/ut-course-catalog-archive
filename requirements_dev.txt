@@ -21,3 +21,4 @@ aiofiles
 pandas
 wordcloud
 janome
+tqdm

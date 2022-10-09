@@ -7,7 +7,7 @@ from setuptools import find_packages, setup
 with open("README.rst") as readme_file:
     readme = readme_file.read()
 
-requirements = ["click>=7.0", "beautifulsoup4>=4.8", "aiohttp>=3.8", "tenacity>=8.1", "aiofiles>=0.7"]
+requirements = ["click>=7.0", "beautifulsoup4>=4.8", "aiohttp>=3.8", "tenacity>=8.1", "aiofiles>=0.7", "tqdm"]
 
 test_requirements = []
 
