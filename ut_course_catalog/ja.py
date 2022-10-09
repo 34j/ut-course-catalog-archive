@@ -923,14 +923,17 @@ class UTCourseCatalog:
             year=year,
             use_tqdm=use_tqdm,
             on_initial_request=on_initial_request,
+            filename=filename,
         )
         from .pandas import to_dataframe
 
         df = to_dataframe(data)
         if not filename:
-            filename = params.id() + "_pandas"
+            filename = params.id()
         if not filename.endswith(".pkl"):
-            filename += ".pkl"
+            filename += ".pandas.pkl"
+        else:
+            filename = filename.replace(".pkl", ".pandas.pkl")
         filepath = Path(filename)
         self._logger.info(f"Saving to {filepath}")
         df.to_pickle(filename)
