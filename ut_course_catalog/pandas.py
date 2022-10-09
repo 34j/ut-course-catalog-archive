@@ -97,3 +97,4 @@ def encode_scoring_method(texts: "pd.Series[str]") -> pd.DataFrame:
 
 def encode_common_code(common_codes: "pd.Series[CommonCode]") -> pd.DataFrame:
     return pd.concat([common_codes.apply(lambda x: x.department)], axis=1)
+
