@@ -17,3 +17,4 @@ beautifulsoup4>=4.8
 myst_parser
 sphinx_rtd_theme
 tenacity
+aiofiles
