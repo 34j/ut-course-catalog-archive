@@ -30,9 +30,9 @@ class TestJa(IsolatedAsyncioTestCase):
         code = utcc.CommonCode("FSC-MA2301L1")
         self.assertEqual(code.institution, utcc.Institution.学部後期課程)
         self.assertEqual(code.faculty, utcc.Faculty.理学部)
-        self.assertEqual(code.department, "MA")
-        self.assertEqual(code.level, 2)
-        self.assertEqual(code.reference_number, 301)
+        self.assertEqual(code.department_code, "MA")
+        self.assertEqual(code.level, '2')
+        self.assertEqual(code.reference_number, '301')
         self.assertEqual(code.class_form, utcc.ClassForm.講義)
         self.assertEqual(code.language, utcc.Language.Japanese)
         

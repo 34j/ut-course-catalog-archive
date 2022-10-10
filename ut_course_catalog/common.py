@@ -20,6 +20,16 @@ class Weekday(IntEnum):
     Fri = 4
     Sat = 5
     Sun = 6
+    
+class Language(Enum):
+    """Language of a course."""
+
+    Japanese = "ja"
+    English = "en"
+    JapaneseAndEnglish = "ja,en"
+    OtherLanguagesToo = "other"
+    OnlyOtherLanguages = "only_other"
+    Others = "others"
 
 
 from typing import (
@@ -130,3 +140,5 @@ def async_iterable_to_iterable(
                 yield coro
         except StopAsyncIteration:
             running = False
+            
+
