@@ -45,7 +45,7 @@ Dataset
 
 したがって、著作権法第三十条の四に基づいて、データセットを公開します。
 
-* [CSV](./All.pickle)
+* `CSV<./All.pickle>`_
 
 Kaggleに登録したいのですが電話番号が無くPublicにできませんでした…
 
