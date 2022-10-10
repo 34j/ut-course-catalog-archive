@@ -107,3 +107,4 @@ ENV/
 *.ipynb
 *.pkl
 analysis/
+!utokyo-course-catalog-tutorial.ipynb

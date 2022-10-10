@@ -37,6 +37,18 @@ Features
 
 * Fetches UTokyo Online Course Catalogue.
 
+Dataset
+-------
+
+* 東京大学授業カタログはインターネット上で公開されており、誰でも無償で入手可能でした。
+* Wayback Machineに登録されているため、情報収集は禁止されていないと思われました。
+
+したがって、著作権法第三十条の四に基づいて、データセットを公開します。
+
+* [CSV](./All.pickle)
+
+Kaggleに登録したいのですが電話番号が無くPublicにできませんでした…
+
 Usage
 -------
 
