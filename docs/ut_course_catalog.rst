@@ -9,6 +9,14 @@ ut\_course\_catalog package
 Submodules
 ----------
 
+ut\_course\_catalog.analysis module
+-----------------------------------
+
+.. automodule:: ut_course_catalog.analysis
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 ut\_course\_catalog.common module
 ---------------------------------
 
