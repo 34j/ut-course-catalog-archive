@@ -46,7 +46,7 @@ Dataset
 したがって、著作権法第三十条の四に基づいて、データセットを公開します。
 
 * `CSV <https://github.com/34j/ut-course-catalog/blob/master/all.csv>`_
-* Twitter映えを目指して軽く解析した`Notebook <https://github.com/34j/ut-course-catalog/blob/master/utokyo-course-catalog-tutorial.ipynb>`_
+* Twitter映えを目指して軽く解析した `Notebook <https://github.com/34j/ut-course-catalog/blob/master/utokyo-course-catalog-tutorial.ipynb>`_
 
 Kaggleに登録したいのですが電話番号が無くPublicにできませんでした…
 
