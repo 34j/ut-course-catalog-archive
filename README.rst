@@ -2,6 +2,9 @@
 ut-course-catalog
 =================
 
+Migrated to `34j/ut-course-catalog <https://github.com/34j/ut-course-catalog>`_
+------------
+
 .. image:: https://img.shields.io/github/license/34j/ut-course-catalog
         :target: https://github.com/34j/ut-course-catalog
         :alt: GitHub License
